@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Masvingo Project</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <style>
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      height: 100%;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: #f4f5f7;
+      color: #1f2328;
+    }
+
+    header {
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 0 16px;
+      background: #1f2937;
+      color: #fff;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+      position: relative;
+      z-index: 1000;
+    }
+
+    header h1 { font-size: 18px; font-weight: 600; margin: 0; white-space: nowrap; }
+
+    #info {
+      font-size: 13px;
+      font-variant-numeric: tabular-nums;
+      opacity: 0.85;
+      text-align: right;
+    }
+
+    #map {
+      height: calc(100% - 56px);
+      width: 100%;
+      background: #d7d8d6;
+    }
+
+    .leaflet-control-layers,
+    .opacity-control {
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+    }
+    .leaflet-control-layers-expanded { padding: 8px 12px; font-size: 14px; }
+    .leaflet-control-layers-base::before,
+    .leaflet-control-layers-overlays::before {
+      display: block;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #6b7280;
+      margin-bottom: 4px;
+    }
+    .leaflet-control-layers-base::before { content: "Base map"; }
+    .leaflet-control-layers-overlays::before { content: "Elevation"; }
+
+    .opacity-control {
+      background: #fff;
+      padding: 8px 12px;
+      font-size: 13px;
+      width: 200px;
+    }
+    .opacity-control label { display: block; margin-bottom: 4px; font-weight: 600; }
+    .opacity-control input { width: 100%; }
+    .opacity-control .note { font-size: 11px; color: #6b7280; margin-top: 4px; }
+
+    .elev-legend {
+      background: #fff;
+      padding: 8px 12px 10px;
+      font-size: 12px;
+      width: 200px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+    }
+    .elev-legend[hidden] { display: none; }
+    .elev-legend h4 { margin: 0 0 2px; font-size: 13px; }
+    .elev-legend .sub { color: #6b7280; font-size: 11px; margin-bottom: 6px; }
+    .elev-legend .ramp {
+      height: 14px;
+      border-radius: 3px;
+      border: 1px solid rgba(0, 0, 0, 0.2);
+    }
+    .elev-legend .ticks {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 3px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .project-panel {
+      background: rgba(255, 255, 255, 0.96);
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+      width: 280px;
+      font-size: 12.5px;
+      line-height: 1.45;
+      color: #1f2328;
+    }
+    .project-panel summary {
+      cursor: pointer;
+      list-style: none;
+      padding: 10px 12px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .project-panel summary::-webkit-details-marker { display: none; }
+    .project-panel summary::after {
+      content: "\25BE";
+      color: #6b7280;
+      transition: transform 0.15s;
+    }
+    .project-panel:not([open]) summary::after { transform: rotate(-90deg); }
+    .project-panel .title { font-size: 14px; font-weight: 700; margin: 0; }
+    .project-panel .kicker {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #b45309;
+    }
+    .project-panel .body {
+      padding: 0 12px 12px;
+      border-top: 1px solid #e5e7eb;
+    }
+    .project-panel p { margin: 8px 0; color: #374151; }
+    .project-panel dl {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 3px 10px;
+      margin: 8px 0 0;
+    }
+    .project-panel dt { color: #6b7280; }
+    .project-panel dd { margin: 0; font-weight: 500; }
+
+    @media (max-width: 600px) {
+      header h1 { font-size: 15px; }
+      #info { font-size: 11px; }
+      .project-panel { width: 230px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Masvingo Project</h1>
+    <div id="info"></div>
+  </header>
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    // ---- Configuration ----
+    const CENTER     = [-20.0516, 30.7434];
+    const START_ZOOM = 18;
+    const MIN_ZOOM   = 13;
+    const MAX_ZOOM   = 24;
+
+    // Optional: paste a Google Maps JavaScript API key to enable "Google Satellite".
+    // Leave empty to use only the free base maps.
+    const GOOGLE_API_KEY = "";
+
+    // Extent of the drone tiles (from the z18 tile grid)
+    const SURVEY_BOUNDS = L.latLngBounds([-20.05722, 30.73700], [-20.04561, 30.75073]);
+
+    // The local tiles are 512x512 PNGs. tileSize 512 + zoomOffset -1 displays them
+    // at full resolution: map zoom N requests tile folder N-1.
+    // Native zooms below are in map-zoom terms (folder zoom + 1).
+    const localOpts = {
+      tileSize: 512,
+      zoomOffset: -1,
+      bounds: SURVEY_BOUNDS,
+      maxZoom: MAX_ZOOM,
+      maxNativeZoom: 22          // folders go up to 21; Leaflet enlarges beyond that
+    };
+
+    // ---- Local drone layers ----
+    // Each layer gets its own pane so the stacking order is fixed:
+    // base map < orthomosaic < DSM/DTM.
+    const map = L.map("map", {
+      center: CENTER,
+      zoom: START_ZOOM,
+      minZoom: MIN_ZOOM,
+      maxZoom: MAX_ZOOM,
+      zoomControl: false        // re-added below so the project panel sits above it
+    });
+
+    // ---- Project details panel (top-left) ----
+    const ProjectPanel = L.Control.extend({
+      options: { position: "topleft" },
+      onAdd() {
+        const el = L.DomUtil.create("details", "project-panel");
+        // Start collapsed only on phone-sized screens
+        el.open = !(window.innerWidth > 0 && window.innerWidth <= 600);
+        el.innerHTML = `
+          <summary>
+            <div>
+              <div class="kicker">Topological survey</div>
+              <h2 class="title">Masvingo Project</h2>
+            </div>
+          </summary>
+          <div class="body">
+            <p>Orthomosaic map captured by DJI Mavic 3M at 250 ft AGL.
+               Single flight mapping mission — 253 photos, 18 minutes.</p>
+            <dl>
+              <dt>Captured</dt>  <dd>Sept 28, 2026</dd>
+              <dt>Camera</dt>    <dd>DJI Mavic 3M, 48MP, nadir</dd>
+              <dt>Altitude</dt>  <dd>250 ft AGL</dd>
+              <dt>Processed</dt> <dd>WebODM + QGIS tiling</dd>
+              <dt>Pilot</dt>     <dd>AGRALON</dd>
+            </dl>
+          </div>`;
+        L.DomEvent.disableClickPropagation(el);
+        L.DomEvent.disableScrollPropagation(el);
+        return el;
+      }
+    });
+    new ProjectPanel().addTo(map);
+    L.control.zoom({ position: "topleft" }).addTo(map);
+
+    map.createPane("ortho").style.zIndex = 250;
+    map.createPane("elevation").style.zIndex = 260;
+
+    const orthomosaic = L.tileLayer("tiles/ortho/{z}/{x}/{y}.webp", {
+      ...localOpts,
+      pane: "ortho",
+      minNativeZoom: 15,         // folders start at 14
+      attribution: "Orthomosaic &copy; Masvingo survey"
+    });
+
+    const dsm = L.tileLayer("tiles/dsm/{z}/{x}/{y}.webp", {
+      ...localOpts,
+      pane: "elevation",
+      minNativeZoom: 13,         // folders start at 12
+      opacity: 0.7
+    });
+
+    const dtm = L.tileLayer("tiles/dtm/{z}/{x}/{y}.webp", {
+      ...localOpts,
+      pane: "elevation",
+      minNativeZoom: 13,
+      maxNativeZoom: 20,         // DTM export is only complete up to folder 19
+      opacity: 0.7
+    });
+
+    // ---- Base maps ----
+    const esriImagery = L.tileLayer(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      // Esri has no deeper imagery here; above 17 it returns "Map data not yet available"
+      { maxZoom: MAX_ZOOM, maxNativeZoom: 17,
+        attribution: "Imagery &copy; Esri, Maxar, Earthstar Geographics" }
+    );
+
+    const esriLabels = L.tileLayer(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
+      { maxZoom: MAX_ZOOM, maxNativeZoom: 17 }
+    );
+
+    const osm = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: MAX_ZOOM, maxNativeZoom: 19,
+      attribution: "&copy; OpenStreetMap contributors"
+    });
+
+    const baseLayers = {
+      "Esri World Imagery": esriImagery,
+      "Esri Imagery + Labels": L.layerGroup([
+        L.tileLayer(esriImagery._url, esriImagery.options),
+        esriLabels
+      ]),
+      "OpenStreetMap": osm
+    };
+
+    const overlays = {
+      "DSM (surface model)": dsm,
+      "DTM (terrain model)": dtm
+    };
+
+    // Default view: Esri imagery with the orthomosaic always on top of it.
+    esriImagery.addTo(map);
+    orthomosaic.addTo(map);
+
+    const layerControl = L.control.layers(baseLayers, overlays, { collapsed: false }).addTo(map);
+    L.control.scale({ imperial: false }).addTo(map);
+
+    // Keep the orthomosaic on whenever the base map changes.
+    map.on("baselayerchange", () => {
+      if (!map.hasLayer(orthomosaic)) orthomosaic.addTo(map);
+    });
+
+    // DSM and DTM share one pane, so show only one at a time.
+    // Deferred so the layer control finishes its click and refreshes its checkboxes.
+    map.on("overlayadd", (e) => {
+      const other = e.layer === dsm ? dtm : e.layer === dtm ? dsm : null;
+      if (other) setTimeout(() => {
+        if (map.hasLayer(other)) map.removeLayer(other);
+      }, 0);
+    });
+
+    // ---- Opacity slider for the elevation layers ----
+    const OpacityControl = L.Control.extend({
+      options: { position: "topright" },
+      onAdd() {
+        const div = L.DomUtil.create("div", "opacity-control");
+        div.innerHTML = `
+          <label for="elevOpacity">DSM / DTM opacity: <span id="elevVal">70%</span></label>
+          <input id="elevOpacity" type="range" min="0" max="100" value="70">
+          <div class="note">Orthomosaic is always shown underneath.</div>`;
+        L.DomEvent.disableClickPropagation(div);
+        L.DomEvent.disableScrollPropagation(div);
+        const input = div.querySelector("#elevOpacity");
+        const val = div.querySelector("#elevVal");
+        input.addEventListener("input", () => {
+          const o = input.value / 100;
+          dsm.setOpacity(o);
+          dtm.setOpacity(o);
+          val.textContent = input.value + "%";
+        });
+        return div;
+      }
+    });
+    new OpacityControl().addTo(map);
+
+    // ---- Legend for DSM / DTM ----
+    // Colour ramp sampled from the DSM/DTM tiles (low -> high).
+    const ELEVATION_RAMP = ["#8c14be", "#5050b0", "#4070b0", "#3090b0", "#20b090", "#60b040", "#a8c820"];
+
+    // Elevation range in metres for each model. The tiles store colours only, so
+    // enter the min/max from your processing software (e.g. the DSM/DTM legend in
+    // WebODM). Leave as null to label the ramp "Low" / "High".
+    const ELEVATION_RANGE = {
+      dsm: { min: null, max: null },
+      dtm: { min: null, max: null }
+    };
+
+    const LEGEND_INFO = {
+      dsm: { title: "DSM – Digital Surface Model", sub: "Elevation incl. trees & buildings" },
+      dtm: { title: "DTM – Digital Terrain Model", sub: "Bare-earth ground elevation" }
+    };
+
+    const LegendControl = L.Control.extend({
+      options: { position: "bottomright" },
+      onAdd() {
+        const div = L.DomUtil.create("div", "elev-legend");
+        div.hidden = true;
+        L.DomEvent.disableClickPropagation(div);
+        this._div = div;
+        return div;
+      },
+      show(key) {
+        if (!key) { this._div.hidden = true; return; }
+        const { title, sub } = LEGEND_INFO[key];
+        const { min, max } = ELEVATION_RANGE[key];
+        let ticks;
+        if (min != null && max != null) {
+          ticks = [0, 0.25, 0.5, 0.75, 1]
+            .map(t => `<span>${(min + t * (max - min)).toFixed(1)}</span>`).join("");
+        } else {
+          ticks = "<span>Low</span><span>High</span>";
+        }
+        const unit = min != null && max != null ? " (m)" : "";
+        this._div.innerHTML = `
+          <h4>${title}</h4>
+          <div class="sub">${sub}${unit}</div>
+          <div class="ramp" style="background: linear-gradient(to right, ${ELEVATION_RAMP.join(", ")})"></div>
+          <div class="ticks">${ticks}</div>`;
+        this._div.hidden = false;
+      }
+    });
+    const legend = new LegendControl().addTo(map);
+
+    function updateLegend() {
+      legend.show(map.hasLayer(dsm) ? "dsm" : map.hasLayer(dtm) ? "dtm" : null);
+    }
+    map.on("overlayadd overlayremove", updateLegend);
+
+    // Outline of the survey area
+    L.rectangle(SURVEY_BOUNDS, {
+      color: "#f59e0b", weight: 2, fill: false, dashArray: "6 4", interactive: false
+    }).addTo(map);
+
+    // Zoom-to-survey button
+    const FitControl = L.Control.extend({
+      options: { position: "topleft" },
+      onAdd() {
+        const a = L.DomUtil.create("a", "leaflet-bar leaflet-control");
+        a.href = "#";
+        a.title = "Zoom to survey area";
+        a.innerHTML = "&#9974;";
+        a.style.cssText = "width:30px;height:30px;line-height:30px;text-align:center;background:#fff;font-size:16px;";
+        L.DomEvent.on(a, "click", (e) => {
+          L.DomEvent.preventDefault(e);
+          map.fitBounds(SURVEY_BOUNDS);
+        });
+        return a;
+      }
+    });
+    new FitControl().addTo(map);
+
+    // ---- Optional Google Satellite (needs an API key) ----
+    if (GOOGLE_API_KEY) {
+      const gScript = document.createElement("script");
+      gScript.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_API_KEY}`;
+      gScript.onload = () => {
+        const mutant = document.createElement("script");
+        mutant.src = "https://unpkg.com/leaflet.gridlayer.googlemutant@0.15.0/dist/Leaflet.GoogleMutant.js";
+        mutant.onload = () => {
+          const google = L.gridLayer.googleMutant({ type: "satellite", maxZoom: MAX_ZOOM });
+          layerControl.addBaseLayer(google, "Google Satellite");
+        };
+        document.head.appendChild(mutant);
+      };
+      document.head.appendChild(gScript);
+    }
+
+    // ---- Header readout ----
+    const info = document.getElementById("info");
+    function updateInfo() {
+      const c = map.getCenter();
+      info.textContent = `Lat ${c.lat.toFixed(5)}, Lng ${c.lng.toFixed(5)} · Zoom ${map.getZoom()}`;
+    }
+    map.on("moveend zoomend", updateInfo);
+    updateInfo();
+  </script>
+</body>
+</html>
