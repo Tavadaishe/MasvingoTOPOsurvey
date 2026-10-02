@@ -5,5 +5,6 @@ Drone topographic survey web map – Masvingo
 
 Live web map: https://tavadaishe.github.io/MasvingoTOPOsurvey/
 
-- `index.html` – Leaflet web map (orthomosaic always on, DSM/DTM overlays, Esri base maps)
+- `index.html` – Leaflet web map (orthomosaic always on, DSM/DTM and Gold Prospectivity overlays, Esri base maps)
 - `tiles/ortho`, `tiles/dsm`, `tiles/dtm` – 512px XYZ tiles in WebP format
+- `tiles/gold` – Gold Prospectivity Classes, 512px XYZ tiles in PNG format
