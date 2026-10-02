@@ -99,6 +99,15 @@
       font-variant-numeric: tabular-nums;
     }
 
+    .gold-legend .classes { list-style: none; margin: 4px 0 0; padding: 0; }
+    .gold-legend .classes li { display: flex; align-items: center; gap: 8px; margin-top: 3px; }
+    .gold-legend .swatch {
+      width: 18px;
+      height: 12px;
+      border-radius: 2px;
+      border: 1px solid rgba(0, 0, 0, 0.2);
+    }
+
     .project-panel {
       background: rgba(255, 255, 255, 0.96);
       border-radius: 8px;
@@ -404,6 +413,34 @@
       legend.show(map.hasLayer(dsm) ? "dsm" : map.hasLayer(dtm) ? "dtm" : null);
     }
     map.on("overlayadd overlayremove", updateLegend);
+
+    // ---- Legend for Gold Prospectivity Classes ----
+    // Class colours taken from the gold tiles.
+    const GOLD_CLASSES = [
+      { label: "High",     color: "#ac182c" },
+      { label: "Moderate", color: "#ffeb13" },
+      { label: "Low",      color: "#1013dc" }
+    ];
+
+    const GoldLegendControl = L.Control.extend({
+      options: { position: "bottomright" },
+      onAdd() {
+        const div = L.DomUtil.create("div", "elev-legend gold-legend");
+        div.hidden = true;
+        div.innerHTML = `
+          <h4>Gold Prospectivity Classes</h4>
+          <ul class="classes">
+            ${GOLD_CLASSES.map(c =>
+              `<li><span class="swatch" style="background:${c.color}"></span>${c.label}</li>`).join("")}
+          </ul>`;
+        L.DomEvent.disableClickPropagation(div);
+        this._div = div;
+        return div;
+      },
+      toggle(show) { this._div.hidden = !show; }
+    });
+    const goldLegend = new GoldLegendControl().addTo(map);
+    map.on("overlayadd overlayremove", () => goldLegend.toggle(map.hasLayer(goldProspectivity)));
 
     // Outline of the survey area
     L.rectangle(SURVEY_BOUNDS, {
