@@ -64,7 +64,7 @@
       margin-bottom: 4px;
     }
     .leaflet-control-layers-base::before { content: "Base map"; }
-    .leaflet-control-layers-overlays::before { content: "Elevation"; }
+    .leaflet-control-layers-overlays::before { content: "Overlays"; }
 
     .opacity-control {
       background: #fff;
@@ -232,6 +232,7 @@
 
     map.createPane("ortho").style.zIndex = 250;
     map.createPane("elevation").style.zIndex = 260;
+    map.createPane("prospectivity").style.zIndex = 270;
 
     const orthomosaic = L.tileLayer("tiles/ortho/{z}/{x}/{y}.webp", {
       ...localOpts,
@@ -253,6 +254,16 @@
       minNativeZoom: 13,
       maxNativeZoom: 20,         // DTM export is only complete up to folder 19
       opacity: 0.7
+    });
+
+    // Gold prospectivity classes: 512px PNG tiles, folders 14-22.
+    const goldProspectivity = L.tileLayer("tiles/gold/{z}/{x}/{y}.png", {
+      ...localOpts,
+      pane: "prospectivity",
+      minNativeZoom: 15,         // folders start at 14
+      maxNativeZoom: 23,         // folders go up to 22
+      opacity: 0.7,
+      attribution: "Gold prospectivity &copy; Masvingo survey"
     });
 
     // ---- Base maps ----
@@ -284,7 +295,8 @@
 
     const overlays = {
       "DSM (surface model)": dsm,
-      "DTM (terrain model)": dtm
+      "DTM (terrain model)": dtm,
+      "Gold Prospectivity Classes": goldProspectivity
     };
 
     // Default view: Esri imagery with the orthomosaic always on top of it.
@@ -316,6 +328,8 @@
         div.innerHTML = `
           <label for="elevOpacity">DSM / DTM opacity: <span id="elevVal">70%</span></label>
           <input id="elevOpacity" type="range" min="0" max="100" value="70">
+          <label for="goldOpacity" style="margin-top:8px">Gold prospectivity opacity: <span id="goldVal">70%</span></label>
+          <input id="goldOpacity" type="range" min="0" max="100" value="70">
           <div class="note">Orthomosaic is always shown underneath.</div>`;
         L.DomEvent.disableClickPropagation(div);
         L.DomEvent.disableScrollPropagation(div);
@@ -326,6 +340,12 @@
           dsm.setOpacity(o);
           dtm.setOpacity(o);
           val.textContent = input.value + "%";
+        });
+        const goldInput = div.querySelector("#goldOpacity");
+        const goldVal = div.querySelector("#goldVal");
+        goldInput.addEventListener("input", () => {
+          goldProspectivity.setOpacity(goldInput.value / 100);
+          goldVal.textContent = goldInput.value + "%";
         });
         return div;
       }
