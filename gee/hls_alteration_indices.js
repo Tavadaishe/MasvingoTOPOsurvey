@@ -15,13 +15,9 @@
  **********************************************************************/
 
 // ============================ 1. SETTINGS ============================
-// Drone survey footprint (from the Masvingo web map). The AOI is the
-// survey rectangle buffered, because the survey itself is only ~1.5 km
-// wide (~50 x 40 HLS pixels). Replace with your own asset if needed, e.g.
-// var aoi = ee.FeatureCollection('users/<you>/masvingo_aoi').geometry();
-var surveyArea = ee.Geometry.Rectangle([30.73700, -20.05722, 30.75073, -20.04561]);
-var BUFFER_M   = 10000;                       // AOI buffer in metres
-var aoi        = surveyArea.buffer(BUFFER_M).bounds();
+// Area of interest: Masvingo boundary asset
+var aoiFc = ee.FeatureCollection('projects/tavadaisheprojects/assets/MASVINGO');
+var aoi   = aoiFc.geometry();
 
 var START_DATE   = '2022-01-01';
 var END_DATE     = '2026-01-01';
@@ -177,8 +173,7 @@ Map.addLayer(ferN,   {min: 0, max: 1, palette: PAL_IRON},   'Ferrous Iron Index'
 Map.addLayer(hai,    {min: 0, max: 1, palette: PAL_HAI},    'Hydrothermal Alteration Index', true);
 Map.addLayer(haiClass, {min: 1, max: 4, palette: PAL_CLASS}, 'Hydrothermal Alteration Classes', false);
 
-Map.addLayer(ee.Image().paint(aoi, 0, 2), {palette: ['black']}, 'AOI');
-Map.addLayer(ee.Image().paint(surveyArea, 0, 2), {palette: ['cyan']}, 'Drone survey area');
+Map.addLayer(ee.Image().paint(aoiFc, 0, 2), {palette: ['black']}, 'AOI – MASVINGO');
 
 // ---- Legends ----
 function colourBar(title, palette, lowLabel, highLabel) {
@@ -279,9 +274,3 @@ exportToDrive(haiClass.visualize({min: 1, max: 4, palette: PAL_CLASS}), 'Masving
 //   assetId: 'users/<your_username>/Masvingo_HLS_Alteration',
 //   region: aoi, scale: EXPORT_SCALE, crs: EXPORT_CRS, maxPixels: 1e13
 // });
-
-// AOI boundary as shapefile
-Export.table.toDrive({
-  collection: ee.FeatureCollection([ee.Feature(aoi, {name: 'Masvingo_AOI'})]),
-  description: 'Masvingo_HLS_AOI', folder: EXPORT_FOLDER, fileFormat: 'SHP'
-});
